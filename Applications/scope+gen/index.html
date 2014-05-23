@@ -124,6 +124,12 @@
     
     $('#trigger_canvas').on({
       'mousedown touchstart': function(evt) {
+      
+        // Ignore the event if trigger source is External or mode is not Normal
+        if(!params.original || params.original.trig_mode != 1 || params.original.trig_source == 2) {
+          return;
+        }
+      
         trig_dragging = true;
         $('input, select', '#accordion').blur();
         mouseDownMove(this, evt);
@@ -166,7 +172,7 @@
         $(this).parent().removeClass('input-group');
         
         var tlev = parseLocalFloat($(this).val());
-        var scale = (params.local.trig_source == 0) ? params.local.scale_ch1 : params.local.scale_ch2;
+        var scale = (params.local.trig_source == 0 ? params.local.scale_ch1 : params.local.scale_ch2);
         if(! isNaN(tlev)) {
           params.local.trig_level = tlev / scale;
           updateTriggerSlider(undefined, false);
@@ -174,7 +180,7 @@
           sendParams();
         }
         else {
-	  tlev = params.local.trig_level * scale;
+          tlev = params.local.trig_level * scale;
           $(this).val(tlev)
         }
         user_editing = false;
@@ -205,18 +211,11 @@
           nearest /= 1000;
         }
         
-        var half = Math.abs(nearest - (max - min)) / 2;
-        var zoomin = (max - min > nearest ? true : false);
-        
-        if(zoomin) {
-          min += half;
-          max -= half;
-        }
-        else {
-          min -= half;
-          max += half;
-        }
-        
+        var center = (min + max) / 2;
+        var half = nearest / 2;
+        min = center - half;
+        max = center + half;
+
         options.xaxes[0].min = min;
         options.xaxes[0].max = max;
 
@@ -247,17 +246,10 @@
           nearest /= 1000;
         }
         
-        var half = Math.abs(nearest - (max - min)) / 2;
-        var zoomin = (max - min > nearest ? true : false);
-        
-        if(zoomin) {
-          min += half;
-          max -= half;
-        }
-        else {
-          min -= half;
-          max += half;
-        }
+        var center = (min + max) / 2;
+        var half = nearest / 2;
+        min = center - half;
+        max = center + half;
         
         options.yaxes[0].min = min;
         options.yaxes[0].max = max;
@@ -749,11 +741,26 @@
     .always(function() {
       if(! last_get_failed) {
         downloading = false;
+        
         if(params.local) {
-          $('#accordion').find('input,select').prop('disabled', false);
+          // Disable trigger level input if trigger source is External or mode is not Normal
+          if(params.original.trig_mode != 1 || params.original.trig_source == 2) {
+            $('#trig_level').prop('disabled', true);
+            if($('#trig_level').is(':focus')) {
+              $('#trig_level').blur();
+            }
+            $('#apply_trig_level').hide().parent().removeClass('input-group');
+          }
+          else {
+            $('#trig_level').prop('disabled', false);
+          }
+          
+          // Manage the state of other components
+          $('#accordion').find('input,select').not('#trig_level').prop('disabled', false);
           $('.btn').not('#btn_single, #range_y_plus, #range_x_plus, #range_x_minus, #gen_ch1_single, #gen_ch2_single').prop('disabled', false);
         }
       }
+      
       if(long_timeout_used) {
         use_long_timeout = false;
       }
@@ -869,7 +876,7 @@
     $('#trig_mode').val(params.original.trig_mode);
     $('#trig_source').val(params.original.trig_source);
     $('#trig_edge').val(params.original.trig_edge);
-    var scale = (params.original.trig_source == 0) ? params.original.scale_ch1 : params.original.scale_ch2;
+    var scale = (params.original.trig_source == 0 ? params.original.scale_ch1 : params.original.scale_ch2);
     $('#trig_level').val(floatToLocalString(params.original.trig_level * scale));
     
     if ((refresh_counter++ % meas_panel_dec) == 0) {
@@ -1088,7 +1095,7 @@
   function addTriggerDataSet(dsets) {
 
     // Transform trigger level to real values
-    var scale = (params.local.trig_source == 0) ? params.local.scale_ch1 : params.local.scale_ch2;
+    var scale = (params.local.trig_source == 0 ? params.local.scale_ch1 : params.local.scale_ch2);
     var tlev = params.local.trig_level * scale;
   
     // Don't add trigger dataset if trigger level is outside the visible area...
@@ -1098,8 +1105,8 @@
         return dsets;
       }
     }
-    // ...or trigger mode is auto
-    if(params.local.trig_mode == 0) {
+    // ...or trigger mode is not Normal
+    if(params.local.trig_mode != 1) {
       return dsets;
     }
     // ...or trigger source is external
@@ -1415,7 +1422,7 @@
         y = evt.clientY - this.getBoundingClientRect().top - plot.getPlotOffset().top;
       }
       
-      var scale = (params.local.trig_source == 0) ? params.local.scale_ch1 : params.local.scale_ch2;
+      var scale = (params.local.trig_source == 0 ? params.local.scale_ch1 : params.local.scale_ch2);
       params.local.trig_level = parseFloat(plot.getAxes().yaxis.c2p(y).toFixed(trigger_level_xdecimal_places)) / scale;           
       
       updateTriggerSlider();
@@ -1441,7 +1448,7 @@
     
     // Transform trigger level to real values
     // TODO: local or original params?
-    var scale = (params.local.trig_source == 0) ? params.local.scale_ch1 : params.local.scale_ch2;
+    var scale = (params.local.trig_source == 0 ? params.local.scale_ch1 : params.local.scale_ch2);
     var tlev = params.local.trig_level * scale;
 
     // If trigger level is outside the predefined ymin/ymax, change the level
@@ -1460,10 +1467,10 @@
       y = plot.getAxes().yaxis.p2c(tlev);
     }
     
-    // If trigger source is external or mode is auto or trigger level is not in visible area, do not show the trigger slider and paint the vertical line with gray
+    // If trigger source is External or mode is not Normal or trigger level is not in visible area, do not show the trigger slider and paint the vertical line with gray
     context.clearRect(0, 0, canvas.width, canvas.height); 
     var yaxis = plot.getAxes().yaxis;
-    if(params.original.trig_mode == 0 || tlev < yaxis.min || tlev > yaxis.max || params.original.trig_source == 2) {
+    if(params.original.trig_mode != 1 || tlev < yaxis.min || tlev > yaxis.max || params.original.trig_source == 2) {
       context.lineWidth = 1;
       context.strokeStyle = '#dddddd';
       context.stroke();
@@ -1497,10 +1504,14 @@
     var ymaxrange = params.original.gui_reset_y_range;
     var xmaxrange = 20.0;  // seconds
     var xminrange = 20e-9; // seconds
-        
+    var decimals = 0;
+
     if(xunit == 'μs' && xrange < 1) {
       xrange *= 1000;
       xunit = 'ns';
+    }
+    if(xrange < 1) {
+      decimals = 1;
     }
     var seconds = (xunit == 'ns' ? 1e-9 : ( xunit == 'μs' ? 1e-6 : (xunit == 'ms' ? 1e-3 : 1)));
     
@@ -1510,7 +1521,7 @@
       ymaxrange *= 1000;
     }
 
-    $('#range_x').html(Math.floor(xrange) + ' ' + xunit);
+    $('#range_x').html(+(Math.round(xrange + "e+" + decimals) + "e-" + decimals) + ' ' + xunit);
     $('#range_y').html(Math.floor(yrange) + ' ' + yunit);
     
     var nearest_x = getNearestRanges(xrange);
@@ -1556,19 +1567,20 @@
     var next = null;
     
     while(i < range_steps.length - 1) {
+      var ratio = range_steps[i+1] / normalized;
+      if(ratio > 0.99 && ratio < 1.01) {
+        prev = range_steps[i];
+        next = range_steps[i+2];
+        break;
+      }
       if(range_steps[i] < normalized && normalized < range_steps[i+1]) {
         prev = range_steps[i];
         next = range_steps[i+1];
         break;
       }
-      if(range_steps[i] < normalized &&  range_steps[i+1] == normalized) {
-        prev = range_steps[i];
-        next = range_steps[i+2];
-        break;
-      }
       i++;
     }
-    
+
     return { 
       prev: prev * Math.pow(10, log10), 
       next: next * Math.pow(10, log10) 
