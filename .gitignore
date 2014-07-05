@@ -1,0 +1,37 @@
+#all from dot
+.*
+#We want save always 
+!.gitignore
+!.config
+!.project
+!.cproject
+#exclude other
+*.o
+*.lo
+*.so
+*.d
+*.bak
+*.log
+*.cache
+*.make
+*.jou
+*.zip
+*.tar
+*.gz
+*.bin
+#Directory
+/target/*
+#Test directory
+#/Test/*/version.h
+/Test/monitor/monitor
+/Test/generate/generate
+/Test/calib/calib
+/Test/acquire/acquire
+#Configure curl
+/shared/curl-7.35.0/*/*/*/Makefile
+/shared/curl-7.35.0/*/*/Makefile
+/shared/curl-7.35.0/Makefile
+/shared/curl-7.35.0/*/Makefile
+/shared/curl-7.35.0/*/curl*.spec
+#FPGA
+/FPGA/release1/vivado/red_pitaya.runs/*
