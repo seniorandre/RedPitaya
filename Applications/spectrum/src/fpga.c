@@ -300,6 +300,59 @@ int spectr_fpga_get_signal(double **cha_signal, double **chb_signal)
     return 0;
 }
 
+
+int spectr_fpga_get_live_signal(double **cha_signal, double **chb_signal)
+{
+    int curr_ptr;
+    int in_idx, out_idx;
+    double *cha_o = *cha_signal;
+    double *chb_o = *chb_signal;
+
+    if(!cha_o || !chb_o) {
+        fprintf(stderr, "spectr_fpga_get_signal() not initialized\n");
+        return -1;
+    }
+
+    // Check current pointer (the buffer is running ("live" mode) )
+    
+    // Use the current pointer (in place of trigger pointer) as circular buffer start reading point
+    spectr_fpga_get_wr_ptr(&curr_ptr, NULL);
+
+    // Start 20 samples after current pointer to avoid RW conflicts 
+    //(experimentally this function takes 15 samples at 0.5 ms rate (about 8 ms) to read all data out)
+         
+    for(in_idx = (curr_ptr+20) + 1, out_idx = 0; 
+        out_idx < (SPECTR_FPGA_SIG_LEN); in_idx++, out_idx++) {
+      
+        if(in_idx >= SPECTR_FPGA_SIG_LEN)
+            in_idx = in_idx % SPECTR_FPGA_SIG_LEN;
+
+        // At the middle of the buffer wait for the extra 20 samples to be written	
+	if (out_idx==8000)
+	{
+	  usleep(200000); // much more than normally necessary...
+	}
+	  
+	    
+        cha_o[out_idx] = g_spectr_fpga_cha_mem[in_idx];
+        chb_o[out_idx] = g_spectr_fpga_chb_mem[in_idx];
+
+        // convert to signed
+        if(cha_o[out_idx] > (double)(1<<13))
+            cha_o[out_idx] -= (double)(1<<14);
+        if(chb_o[out_idx] > (double)(1<<13))
+            chb_o[out_idx] -= (double)(1<<14);
+	
+	
+	
+    }
+    // Good to log curr_ptr_end for reading time measurement (without sleep: curr_ptr_end-curr_ptr=15)
+    //spectr_fpga_get_wr_ptr(&curr_ptr_end, NULL); 
+   
+    
+    return 0;
+}
+
 int spectr_fpga_get_wr_ptr(int *wr_ptr_curr, int *wr_ptr_trig)
 {
     if(wr_ptr_curr)

@@ -1,9 +1,10 @@
 /**
  * $Id$
  *
- * @brief Red Pitaya Spectrum Analyzer FPGA Interface.
+ * @brief Red Pitaya Spectrum Analyzer DSP LTI modified FPGA Interface 
  *
  * @Author Jure Menart <juremenart@gmail.com>
+ * @Author Dashpi <dashpi46@gmail.com>
  *         
  * (c) Red Pitaya  http://www.redpitaya.com
  *
@@ -40,24 +41,27 @@ typedef struct hk_fpga_reg_mem_s {
 } hk_fpga_reg_mem_t;
 
 /* Base address 0x40100000 */
-#define SPECTR_FPGA_BASE_ADDR 0x40100000
-#define SPECTR_FPGA_BASE_SIZE 0x30000
+#define LTI_FPGA_BASE_ADDR 0x40100000
+#define LTI_FPGA_BASE_SIZE 0x30000
 
-#define SPECTR_FPGA_SIG_LEN   (16*1024)
+#define LTI_FPGA_SIG_LEN   (16*1024)
+#define LTI_DSP_STATES     128
+#define LTI_DSP_PARAMS     128
 
-#define SPECTR_FPGA_CONF_ARM_BIT  1
-#define SPECTR_FPGA_CONF_RST_BIT  2
 
-#define SPECTR_FPGA_TRIG_SRC_MASK 0x00000007
-#define SPECTR_FPGA_CHA_THR_MASK  0x00003fff
-#define SPECTR_FPGA_CHB_THR_MASK  0x00003fff
-#define SPECTR_FPGA_TRIG_DLY_MASK 0xffffffff
-#define SPECTR_FPGA_DATA_DEC_MASK 0x0001ffff
+#define LTI_FPGA_CONF_ARM_BIT  1
+#define LTI_FPGA_CONF_RST_BIT  2
 
-#define SPECTR_FPGA_CHA_OFFSET    0x10000
-#define SPECTR_FPGA_CHB_OFFSET    0x20000
+#define LTI_FPGA_TRIG_SRC_MASK 0x00000007
+#define LTI_FPGA_CHA_THR_MASK  0x00003fff
+#define LTI_FPGA_CHB_THR_MASK  0x00003fff
+#define LTI_FPGA_TRIG_DLY_MASK 0xffffffff
+#define LTI_FPGA_DATA_DEC_MASK 0x0001ffff
 
-typedef struct spectr_fpga_reg_mem_s {
+#define LTI_FPGA_CHA_OFFSET    0x10000
+#define LTI_FPGA_CHB_OFFSET    0x20000
+
+typedef struct lti_fpga_reg_mem_s {
     /* configuration:
      * bit     [0] - arm_trigger
      * bit     [1] - rst_wr_state_machine
@@ -184,59 +188,67 @@ typedef struct spectr_fpga_reg_mem_s {
 
     /* ChA & ChB data - 14 LSB bits valid starts from 0x10000 and
      * 0x20000 and are each 16k samples long */
-} spectr_fpga_reg_mem_t;
+} lti_fpga_reg_mem_t;
 
-int spectr_fpga_init(void);
-int spectr_fpga_exit(void);
+int lti_fpga_init(void);
+int lti_fpga_exit(void);
 
-int spectr_fpga_update_params(int trig_imm, int trig_source, int trig_edge, 
+int lti_fpga_update_params(int trig_imm, int trig_source, int trig_edge, 
                            float trig_delay, float trig_level, int time_range,
                            int enable_avg_at_dec);
-int spectr_fpga_reset(void);
-int spectr_fpga_arm_trigger(void);
-int spectr_fpga_set_trigger(uint32_t trig_source);
-int spectr_fpga_set_trigger_delay(uint32_t trig_delay);
+int lti_fpga_reset(void);
+int lti_fpga_arm_trigger(void);
+int lti_fpga_set_trigger(uint32_t trig_source);
+int lti_fpga_set_trigger_delay(uint32_t trig_delay);
 
 /* Returns 0 if no trigger, 1 if trigger */
-int spectr_fpga_triggered(void);
+int lti_fpga_triggered(void);
 
-/* Returns pointer to the ChA and ChB signals (of length SPECTR_FPGA_SIG_LEN) */
-int spectr_fpga_get_sig_ptr(int **cha_signal, int **chb_signal);
+/* Returns pointer to the ChA and ChB signals (of length LTI_FPGA_SIG_LEN) */
+int lti_fpga_get_sig_ptr(int **cha_signal, int **chb_signal);
 
 /* Copies the last acquisition (trig wr. ptr -> curr. wr. ptr) */
-int spectr_fpga_get_signal(double **cha_signal, double **chb_signal);
+int lti_fpga_get_signal(double **cha_signal, double **chb_signal);
+
+/* Acquisition embedded DSP module */
+int lti_fpga_online_dsp(double **ch1_data, double **ch2_data, int gen_delay, double **state_a, double **state_b, double **dsp_par_a, double **dsp_par_b, int dsp_loc_ptr, int **awg_a_ptr, int **awg_b_ptr);
+
+/* Helper function: complement two's conversion*/
+double conv_s14_to_double(int sigs14);
+/* Helper function: complement two's conversion*/
+int conv_double_to_s14(double sig);
 
 /* Acquires data when circular buffer running */
-int spectr_fpga_get_live_signal(double **cha_signal, double **chb_signal);
+int lti_fpga_get_live_signal(double **cha_signal, double **chb_signal);
 
 /* Returns signal pointers from the FPGA */
-int spectr_fpga_get_wr_ptr(int *wr_ptr_curr, int *wr_ptr_trig);
+int lti_fpga_get_wr_ptr(int *wr_ptr_curr, int *wr_ptr_trig);
 
 /* Returnes signal content */
 /* various constants */
-extern const float c_spectr_fpga_smpl_freq;
-extern const float c_spectr_fpga_smpl_period;
+extern const float c_lti_fpga_smpl_freq;
+extern const float c_lti_fpga_smpl_period;
 
 /* helper conversion functions */
 /* Convert correct value for FPGA trigger source from trig_immediately, 
  * trig_source and trig_edge from application params.
  */
-int spectr_fpga_cnv_trig_source(int trig_imm, int trig_source, int trig_edge);
+int lti_fpga_cnv_trig_source(int trig_imm, int trig_source, int trig_edge);
 /* Converts freq_range parameter (0-5) to decimation factor */
-int spectr_fpga_cnv_freq_range_to_dec(int freq_range);
+int lti_fpga_cnv_freq_range_to_dec(int freq_range);
 /* Converts freq_range parameter (0-5) to unit enumerator */
-int spectr_fpga_cnv_freq_range_to_unit(int freq_range);
+int lti_fpga_cnv_freq_range_to_unit(int freq_range);
 
 /* Converts time in [s] to ADC samples (depends on decimation) */
-int spectr_fpga_cnv_time_to_smpls(float time, int dec_factor);
+int lti_fpga_cnv_time_to_smpls(float time, int dec_factor);
 /* Converts voltage in [V] to ADC counts */
-int spectr_fpga_cnv_v_to_cnt(float voltage);
+int lti_fpga_cnv_v_to_cnt(float voltage);
 /* Converts ADC ounts to [V] */
-float spectr_fpga_cnv_cnt_to_v(int cnts);
+float lti_fpga_cnv_cnt_to_v(int cnts);
 
 /* debugging - will be removed */
-extern spectr_fpga_reg_mem_t *g_spectr_fpga_reg_mem;
-extern                int  g_spectr_fpga_mem_fd;
-int __spectr_fpga_cleanup_mem(void);
+extern lti_fpga_reg_mem_t *g_lti_fpga_reg_mem;
+extern                int  g_lti_fpga_mem_fd;
+int __lti_fpga_cleanup_mem(void);
 
 #endif /* __FPGA_H*/

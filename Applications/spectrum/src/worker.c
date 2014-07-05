@@ -341,6 +341,9 @@ void *rp_spectr_worker_thread(void *args)
     int                      jpg_fn_cnt = 0;
     /* depends on freq_range - do not save too much or too less */
     int                      jpg_write_div = 10;
+    
+    int                      armed=0;
+    
     rp_spectr_worker_res_t   tmp_result;
 
     pthread_mutex_lock(&rp_spectr_ctrl_mutex);
@@ -398,8 +401,29 @@ void *rp_spectr_worker_thread(void *args)
             continue;
         }
 
+        if (curr_params[FREQ_RANGE_PARAM].value==5)
+	{
+	     // 0.524 ms sample rate: there is enough time to read the whole buffer without stopping it 
+        
+ 	if (armed==0)
+	{
+	/* Start the writting machine*/
+        spectr_fpga_arm_trigger();	     
+        armed=1;  // Arm just the first time
+	}
+	
+	// Just read the buffer (when running)
+	spectr_fpga_get_live_signal(&rp_cha_in, &rp_chb_in);
+	
+	} 
+	
+	else
+	{    // Classic acquisition procedure (buffer stopped when full)
+	  
         /* Start the writting machine */
+        armed=0; 
         spectr_fpga_arm_trigger();
+
         
         usleep(10);
 
@@ -438,7 +462,9 @@ void *rp_spectr_worker_thread(void *args)
 
         /* retrieve data and process it*/
         spectr_fpga_get_signal(&rp_cha_in, &rp_chb_in);
-
+	}
+	
+	
         rp_spectr_prepare_freq_vector(&rp_tmp_signals[0], 
                                       c_spectr_fpga_smpl_freq,
                                       curr_params[FREQ_RANGE_PARAM].value);
